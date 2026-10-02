@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Couple OS — one shared system for the two of you</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<nav><b>Couple OS</b><div style="display:flex;gap:10px"><button class="btn alt" id="nameb" hidden>Edit names</button><button class="btn alt" id="authb">Log in</button></div></nav>
+<div class="hi"><h1 id="hit"></h1><p>Your shared dashboard. Try each module below.</p><p id="sync" role="status" style="font-size:14px;min-height:22px"></p></div>
+<header class="hero">
+  <div>
+    <img src="hero.jpg" alt="Couple OS logo: a teal and a coral heart interlocked around the letters OS">
+    <h1>One home base for the two of you.</h1>
+    <p>Money, plans, groceries, chores and goals in a single shared dashboard, so nobody has to be the one who remembers everything.</p>
+    <div class="cta"><button class="btn" id="signb">Create your account</button><a class="btn alt" href="#how">See how it works</a></div>
+  </div>
+  <div class="os" aria-label="Interactive Couple OS demo">
+    <div class="bar"><i></i><i></i><i></i><span>Our dashboard · try it</span></div>
+    <div class="dock" role="tablist" id="dock"></div>
+    <div class="pane" id="pane" role="tabpanel"></div>
+  </div>
+</header>
+</div>
+
+<section><div class="wrap">
+  <h2>Eight modules, one shared view.</h2>
+  <p class="lead">Each part works alone and connects to the rest, like apps on the same system.</p>
+  <div class="grid">
+    <div class="feat"><h3>Shared Calendar</h3><p>Dates, trips, appointments and deadlines in one place you both see.</p></div>
+    <div class="feat"><h3>Budget & Expenses</h3><p>Log spending, see who covered what and settle up without awkward maths.</p></div>
+    <div class="feat"><h3>Grocery & Home Shopping</h3><p>One live list. Whoever is at the store ticks things off for both.</p></div>
+    <div class="feat"><h3>Travel & Date Bucket List</h3><p>Keep every idea, then turn the ones you pick into dated plans and itineraries.</p></div>
+    <div class="feat"><h3>Home Chores Deck</h3><p>Draw a card, do the task, swap when life gets busy. Repairs get a log.</p></div>
+    <div class="feat"><h3>Shared Diary</h3><p>Write about the days worth remembering and read them back together.</p></div>
+    <div class="feat"><h3>Photo Album</h3><p>Keep your favorite pictures of the two of you, with captions.</p></div>
+    <div class="feat"><h3>Goals & Milestones</h3><p>Set yearly goals together and mark the moments worth remembering.</p></div>
+  </div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>Set up in an evening.</h2>
+  <p class="lead">Start with a template, then make it yours.</p>
+  <div class="steps">
+    <div class="step"><h3>Pick your modules</h3><p>Turn on what you need. Skip what you don't.</p></div>
+    <div class="step"><h3>Fill it in together</h3><p>Add events, expenses, photos and diary entries as you go.</p></div>
+    <div class="step"><h3>Hold a monthly check-in</h3><p>Review money, chores and goals together in 20 minutes.</p></div>
+  </div>
+</div></section>
+
+<footer>© 2026 Couple OS · Synced between the two of you, and changes made offline sync when you reconnect</footer>
+
+<dialog id="dlg" data-m="in"><form id="af">
+<h2 id="dh">Welcome back</h2>
+<div class="tabs"><button type="button" data-m="up">Sign up</button><button type="button" data-m="in">Log in</button></div>
+<div class="f-n"><label for="n1">Partner 1 name</label><input type="text" id="n1" maxlength="30" autocomplete="off"><label for="n2">Partner 2 name</label><input type="text" id="n2" maxlength="30" autocomplete="off"></div>
+<div class="f-c"><label for="em2">Email</label><input type="email" id="em2" autocomplete="email"><label for="pw">Password</label><input type="password" id="pw" autocomplete="current-password"></div>
+<p id="err" role="alert"></p>
+<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" style="flex:1">Continue</button><button type="button" class="btn alt" id="cls">Cancel</button></div>
+<p class="dnote">You both log in with the same email and password to share one dashboard.</p></form></dialog>
+<dialog id="pv">
+<img id="pvi" alt="">
+<p class="dnote" id="pvd"></p>
+<label for="pvt">Caption</label><input type="text" id="pvt" maxlength="120" placeholder="Add a caption">
+<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button type="button" class="btn" id="pvs">Save caption</button><button type="button" class="btn alt" id="pvx">Delete photo</button><button type="button" class="btn alt" id="pvc">Close</button></div>
+</dialog>
+<script src="firebase-bundle.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
