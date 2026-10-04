@@ -65,6 +65,7 @@ window.FB = {
   },
   getFull: async (uid, id) => { const s = await getDoc(photoFull(uid, id)); return s.exists() ? s.data().d : null; },
   setCaption: (uid, id, c) => updateDoc(photoMeta(uid, id), { c }),
+  patchPhoto: (uid, id, o) => updateDoc(photoMeta(uid, id), o),
   delPhoto: (uid, id) => {
     const b = writeBatch(db);
     b.delete(photoFull(uid, id));

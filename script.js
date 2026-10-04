@@ -3,51 +3,94 @@ const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const plus=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
 const ago=n=>new Date(Date.now()-n*864e5).toISOString();
 const S={
+ home:{n:'Home',sub:'This week at a glance'},
  cal:{n:'Calendar',sub:'Add dates and events, remove them when done',items:[['Dinner at Marco’s',plus(1)],['Rent due',plus(2)],['Farmers market',plus(3)],['Call with parents',plus(4)]]},
  bud:{n:'Budget',sub:'Shared expenses · tap one for details',ex:[['Groceries',2450,'A',ago(6)],['Electric bill',3180,'B',ago(3)],['Movie night',850,'A',ago(1)]]},
  gro:{n:'Groceries',sub:'One list, two phones',items:[['Eggs',0],['Coffee beans',1],['Basil',0]]},
  trv:{n:'Bucket list',sub:'Trips and dates to plan',items:[['Weekend in Bohol',0],['Sunset picnic',0],['Cooking class',1]]},
+ dat:{n:'Date night',sub:'Add ideas, we pick one',deck:['Sunset picnic','Cook a new recipe together','Movie marathon','Walk and street food'],i:0},
  chr:{n:'Chores deck',sub:'Draw a card, we pick whose turn it is',deck:['Wash the dishes','Take out trash','Water the plants','Fix leaky tap','Clean the fridge'],i:0,who:'A'},
  dia:{n:'Diary',sub:'Write about your days together · tap one to read',entries:[['Our first entry','Write about today: what made you smile?',ago(0)]]},
- alb:{n:'Album',sub:'Our pictures together'},
+ alb:{n:'Album',sub:'Albums of your pictures, e.g. This day or Yesterday',names:['Our photos']},
  gol:{n:'Goals',sub:'Drag to update progress',g:[['Save for our trip',60],['Cook at home 3×/week',40],['Weekly walk together',75]]}
 };
-let N={A:'Partner A',B:'Partner B'};let ready=false;let cur='cal';let openEx=-1,openDx=-1,lastCur='cal';
+let N={A:'Partner A',B:'Partner B'};let ready=false;let cur='home';let openEx=-1,openDx=-1,lastCur='home',bm='',gm=null,dq='',favOnly=false,curAlb=null;
 const dock=document.getElementById('dock'),pane=document.getElementById('pane');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmtD=s=>new Date(s+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
 const fmtT=s=>new Date(s).toLocaleString(undefined,{month:'long',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
 const peso=n=>'₱'+(+n).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const ym=d=>{const x=new Date(d);return x.getFullYear()+'-'+pad(x.getMonth()+1)};
+const occ=(x,k)=>x[1]==k||(x[1]<=k&&((x[2]==1&&x[1].slice(8)==k.slice(8))||(x[2]==2&&x[1].slice(5)==k.slice(5))));
+const ECAT=['Anniversary','Birthday','Date','Trip','Appointment','Important','Celebration'];
+const nx=x=>{const d=new Date(x[1]+'T00:00:00'),t=new Date();t.setHours(0,0,0,0);if(x[2])while(d<t)x[2]==2?d.setFullYear(d.getFullYear()+1):d.setMonth(d.getMonth()+1);return d};
+const cd=d=>{const t=new Date();t.setHours(0,0,0,0);const n=Math.round((d-t)/864e5);return n==0?'Today':n==1?'Tomorrow':n>0?'in '+n+' days':-n+' days ago'};
+const CAT=['Food','Bills','Dates','Transport','Other'];
+const fmtTm=t=>new Date('2000-01-01T'+t).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
 const fmtS=s=>new Date(s).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
 const delb=(i,t)=>`<button class="x" data-del="${i}" aria-label="Delete ${esc(t)}">×</button>`;
-function list(k,del){return S[k].items.map((x,i)=>`<div class="row ${x[1]?'done':''}"><input type="checkbox" id="${k}${i}" data-k="${k}" data-i="${i}" ${x[1]?'checked':''}><label for="${k}${i}">${esc(x[0])}</label>${del?delb(i,x[0]):''}</div>`).join('')||'<p class="empty">Nothing here yet.</p>'}
+function list(k,del){return S[k].items.map((x,i)=>[x,i]).reverse().map(([x,i])=>`<div class="row ${x[1]?'done':''}"><input type="checkbox" id="${k}${i}" data-k="${k}" data-i="${i}" ${x[1]?'checked':''}><label for="${k}${i}">${esc(x[0])}${x[2]>1?' ×'+x[2]:''}</label>${del?delb(i,x[0]):''}</div>`).join('')||'<p class="empty">Nothing here yet.</p>'}
 function addf(ph){return `<div class="add"><input type="text" id="new" placeholder="${ph}" aria-label="${ph}"><button id="addb">Add</button></div>`}
+function grof(){return '<div class="add"><input type="text" id="new" placeholder="Add an item" aria-label="Add an item"><input type="number" id="qty" min="1" placeholder="Qty" aria-label="Quantity" style="width:70px;flex:none"><button id="addb">Add</button></div>'}
+function calTop(m){
+ const now=new Date(),g0=gm||(gm=new Date(now.getFullYear(),now.getMonth(),1)),dim=new Date(g0.getFullYear(),g0.getMonth()+1,0).getDate(),tk=iso(now);
+ const days=m.since?Math.floor((new Date().setHours(0,0,0,0)-new Date(m.since+'T00:00:00'))/864e5):-1;
+ const cell=d=>{const k=g0.getFullYear()+'-'+pad(g0.getMonth()+1)+'-'+pad(d),ev=m.items.filter(x=>occ(x,k)).sort((p,q)=>(p[3]||'').localeCompare(q[3]||''));
+  return `<span class="${ev.length?'ev':''} ${k==tk?'td':''}" title="${esc(ev.map(x=>(x[3]?fmtTm(x[3])+' ':'')+x[0]).join(', '))}"><b>${d}</b>${ev.slice(0,2).map(x=>`<em>${esc(x[0])}</em>`).join('')}${ev.length>2?`<em>+${ev.length-2}</em>`:''}</span>`};
+  return `<div class="card" style="margin:10px 0"><small style="margin:0">Days together</small><b>${days>=0?days.toLocaleString():'Set your date below'}</b><div class="add" style="margin-top:8px"><input type="date" id="since" value="${m.since||''}" aria-label="Date you got together"></div></div>
+ <div class="cg"><div class="cgh"><button class="x" data-gm="-1" aria-label="Previous month">‹</button><b>${g0.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</b><button class="x" data-gm="1" aria-label="Next month">›</button></div><div class="cgd">${['S','M','T','W','T','F','S'].map(d=>`<i>${d}</i>`).join('')}${'<span></span>'.repeat(g0.getDay())}${Array.from({length:dim},(_,k)=>cell(k+1)).join('')}</div></div>`}
+function diaList(){
+ const m=S.dia,q=dq.trim().toLowerCase();
+ const rows=m.entries.map((x,i)=>[x,i]).filter(([x])=>!q||(x[0]+' '+x[1]).toLowerCase().includes(q)).sort((p,r)=>r[0][2].localeCompare(p[0][2]));
+ return rows.map(([x,i])=>{const o=openDx==i;return `<button class="rowb" data-dx="${i}" aria-expanded="${o}"><label>${esc(x[0])}</label><span class="when2">${esc((x[4]?N[x[4]]+' · ':'')+(x[3]?x[3]+' · ':'')+fmtS(x[2]))}</span><span class="chev" aria-hidden="true"></span></button>`+(o?`<div class="det"><div class="entry">${esc(x[1])}</div><div><span>Written ${esc(fmtT(x[2]))}</span></div><button class="btn alt" style="justify-self:start;padding:8px 16px;font-size:14px" data-dd="${i}">Delete entry</button></div>`:'')}).join('')||'<p class="empty">'+(q?'No entries match your search.':'No entries yet. Write the first one above.')+'</p>'}
+function notifLine(){if(!('Notification' in window))return '';const p=Notification.permission;
+ return p=='default'?'<div class="mini" style="margin:6px 0"><button data-a="notif">Turn on reminders</button></div>':p=='denied'?'<small>Browser notifications are blocked. Reminders still pop up on this page.</small>':'<small>Reminders are on. You get one when an event time arrives.</small>'}
+function albNames(){const set=new Set((S.alb&&S.alb.names)||[]);photos.forEach(p=>set.add(p.a||'Our photos'));set.add('Our photos');return [...set]}
+function albUI(){
+ if(curAlb==null)return `<div class="add"><input type="text" id="new" placeholder="New album, e.g. Yesterday's pictures" maxlength="40" aria-label="New album name"><button id="addb">Create</button></div><div class="gal" id="gal"></div>`;
+ return `<div class="add"><button class="x" data-ab="1" aria-label="Back to albums" style="font-size:15px">‹ Albums</button><b style="flex:1">${esc(curAlb)}</b><input type="file" id="pick" class="sr" accept="image/*" multiple><label class="upl" for="pick">Add photos</label></div><label class="when2" style="display:flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="favo" ${favOnly?'checked':''}> Favorites only</label><p id="albmsg" class="empty" role="status" style="padding:0"></p><div class="gal" id="gal"></div>`}
+function homeUI(){
+ const hr=new Date().getHours(),gr=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening',t0=new Date();t0.setHours(0,0,0,0);
+ const up=S.cal.items.map(x=>[x,nx(x)]).filter(([x,d])=>d>=t0&&(d-t0)/864e5<=7).sort((a,b)=>a[1]-b[1]),
+  gro=S.gro.items.filter(x=>!x[1]).length,G=S.gol.g[0],dn=S.dat.deck[S.dat.i],ch=S.chr.deck[S.chr.i],
+  T=G&&G[2]?Math.min(100,Math.round((G[3]||0)/G[2]*100)):G?G[1]:0;
+ const row=(a,b)=>`<div class="row"><span class="when">${a}</span><label style="cursor:default">${b}</label></div>`;
+ return `<h3>${gr}, ${esc(N.A)} & ${esc(N.B)}.</h3><small>This week at a glance</small>`+
+  (up.map(([x,d])=>row(esc(cd(d)),esc(x[0])+(x[3]?' at '+fmtTm(x[3]):'')+(x[4]?` <span class="when2">${esc(x[4])}</span>`:''))).join('')||row('This week','No events coming up'))+
+  row('Groceries',gro+' item'+(gro==1?'':'s')+' remaining')+row('Next chore',ch?esc(ch)+' · '+esc(N[S.chr.who]):'None')+(G?row('Goal',esc(G[0])+' · '+T+'%'):'')+(dn?row('Date night idea',esc(dn)):'')}
 function render(){
  dock.innerHTML=Object.keys(S).map(k=>`<button role="tab" aria-selected="${k==cur}" data-t="${k}">${S[k].n}</button>`).join('');
  const m=S[cur];let h=`<h3>${m.n}</h3><small>${m.sub}</small>`;
- if(cur=='bud'){
-  const a=m.ex.filter(e=>e[2]=='A').reduce((s,e)=>s+e[1],0),b=m.ex.filter(e=>e[2]=='B').reduce((s,e)=>s+e[1],0),t=a+b||1;
-  h+=m.ex.map((e,i)=>{const o=openEx==i;return `<button class="rowb" data-ex="${i}" aria-expanded="${o}"><span class="dot ${e[2]=='A'?'t':'c'}"></span><label>${esc(e[0])}</label><b>${peso(e[1])}</b><span class="chev" aria-hidden="true"></span></button>`+
-   (o?`<div class="det"><div><span>Expense</span> · ${esc(e[0])}</div><div><span>Amount</span> · ${peso(e[1])}</div><div><span>Paid by</span> · ${esc(N[e[2]])}</div><div><span>Date added</span> · ${e[3]?fmtT(e[3]):'Not recorded'}</div></div>`:'')}).join('')+
+ if(cur=='home'){h=homeUI()}else if(cur=='bud'){
+  if(!bm)bm=ym(new Date());
+  const E=m.ex.map((e,i)=>[e,i]).filter(([e])=>ym(e[3]||new Date())==bm).reverse().sort((p,q)=>String(q[0][3]||'').localeCompare(String(p[0][3]||'')));
+  const sum=f=>E.filter(f).reduce((q,[e])=>q+e[1],0),a=sum(([e])=>e[2]=='A'),b=sum(([e])=>e[2]=='B'),tot=a+b,t=tot||1,lim=m.lim||0,pct=lim?Math.min(100,tot/lim*100):0;
+  h+=`<div class="add wrapit"><input type="month" id="bm" value="${bm}" aria-label="Month"><input type="number" id="lim" min="0" step="any" value="${lim||''}" placeholder="Monthly limit ₱" aria-label="Monthly spending limit"></div>`+
+  (lim?`<div class="bar" role="progressbar" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><i class="${tot>lim?'over':''}" style="width:${pct}%"></i></div><small>${peso(tot)} of ${peso(lim)} · ${tot>lim?peso(tot-lim)+' over the limit':peso(lim-tot)+' left'}</small>`:'<small>Set a monthly limit to see your progress.</small>')+
+  `<div class="chips">${CAT.map(c=>`<span>${c} ${peso(sum(([e])=>(e[4]||'Other')==c))}</span>`).join('')}</div>`+
+  (E.map(([e,i])=>{const o=openEx==i;return `<button class="rowb" data-ex="${i}" aria-expanded="${o}"><span class="dot ${e[2]=='A'?'t':'c'}"></span><label>${esc(e[0])}</label><b>${peso(e[1])}</b><span class="chev" aria-hidden="true"></span></button>`+
+   (o?`<div class="det"><div><span>Expense</span> · ${esc(e[0])}</div><div><span>Amount</span> · ${peso(e[1])}</div><div><span>Category</span> · ${esc(e[4]||'Other')}</div><div><span>Paid by</span> · ${esc(N[e[2]])}</div><div><span>Date added</span> · ${e[3]?fmtT(e[3]):'Not recorded'}</div></div>`:'')}).join('')||'<p class="empty">No expenses this month.</p>')+
   `<div class="split"><div class="t" style="width:${a/t*100}%"></div><div class="c" style="width:${b/t*100}%"></div></div>
-  <small>Total this month · ${peso(a+b)}</small>
-  <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
+  <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="cat" aria-label="Category">${CAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='cal'){
-  const rows=m.items.map((x,i)=>[x,i]).sort((p,q)=>p[0][1].localeCompare(q[0][1]));
-  h+=(rows.map(([x,i])=>`<div class="row"><span class="when">${esc(fmtD(x[1]))}</span><label style="cursor:default">${esc(x[0])}</label>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
-  `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><button id="addb">Add</button></div>`;
+  const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
+  h+=calTop(m)+notifLine();
+  h+=(rows.map(([x,i,d])=>`<div class="row"><span class="when">${esc(fmtD(iso(d)))}</span><label style="cursor:default">${esc(x[0])} <span class="when2">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></label>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
+  `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
-  h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck</small>`;
+  h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck · Done so far: ${esc(N.A)} ${(m.tally||{}).A||0}, ${esc(N.B)} ${(m.tally||{}).B||0}</small>`;
+ }else if(cur=='dat'){
+  h+=`<div class="card"><small style="margin:0">Tonight's idea</small><b>${esc(m.deck[m.i]||'Add an idea below')}</b></div><div class="mini"><button data-a="pick">Pick one</button><button data-a="dmark">Mark as done</button></div>`+addf('Add a date idea')+`<div style="margin-top:10px">${m.deck.map((t,i)=>[t,i]).reverse().map(([t,i])=>{const dn=(m.done||[]).includes(t);return `<div class="row ${dn?'done':''}"><input type="checkbox" id="dn${i}" data-dn="${i}" ${dn?'checked':''}><label for="dn${i}">${esc(t)}</label></div>`}).join('')}</div>`;
  }else if(cur=='dia'){
-  const rows=m.entries.map((x,i)=>[x,i]).sort((p,q)=>q[0][2].localeCompare(p[0][2]));
-  h+=`<div class="add" style="flex-direction:column"><input type="text" id="new" placeholder="Title (optional)" maxlength="80" aria-label="Title"><textarea id="dtxt" rows="4" placeholder="Dear diary…" aria-label="Diary entry"></textarea><button id="addb" style="padding:12px">Save entry</button></div><div style="margin-top:10px">`+
-  (rows.map(([x,i])=>{const o=openDx==i;return `<button class="rowb" data-dx="${i}" aria-expanded="${o}"><label>${esc(x[0])}</label><span class="when2">${esc(fmtS(x[2]))}</span><span class="chev" aria-hidden="true"></span></button>`+
-   (o?`<div class="det"><div class="entry">${esc(x[1])}</div><div><span>Written ${esc(fmtT(x[2]))}</span></div><button class="btn alt" style="justify-self:start;padding:8px 16px;font-size:14px" data-dd="${i}">Delete entry</button></div>`:'')}).join('')||'<p class="empty">No entries yet. Write the first one above.</p>')+'</div>';
+  h+=`<input type="search" id="dq" placeholder="Search entries" aria-label="Search entries" value="${esc(dq)}" style="width:100%;margin:8px 0;font:inherit;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><div class="add" style="flex-direction:column"><input type="text" id="new" placeholder="Title (optional)" maxlength="80" aria-label="Title"><textarea id="dtxt" rows="4" placeholder="Dear diary…" aria-label="Diary entry"></textarea><div class="add wrapit"><select id="dwho" aria-label="Written by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><select id="dmood" aria-label="Mood">${['Happy','Calm','Excited','Grateful','Tired','Sad'].map(c=>`<option>${c}</option>`).join('')}</select></div><button id="addb" style="padding:12px">Save entry</button></div><div id="dl" style="margin-top:10px">${diaList()}</div>`;
  }else if(cur=='alb'){
-  h+=me?`<div class="add"><input type="file" id="pick" class="sr" accept="image/*" multiple><label class="upl" for="pick">Add photos</label></div><p id="albmsg" class="empty" role="status" style="padding:8px 0 0"></p><div class="gal" id="gal"></div>`:`<p class="empty">Log in or create an account to keep your photos. They are saved to your shared cloud album.</p>`;
+  h+=me?albUI():`<p class="empty">Log in or create an account to keep your photos. They are saved to your shared cloud album.</p>`;
  }else if(cur=='gol'){
-  h+=(m.g.map((g,i)=>`<div style="margin:12px 0"><div class="row" style="border:0;padding:0"><label>${esc(g[0])}</label><b>${g[1]}%</b><button class="x" data-gd="${i}" aria-label="Delete goal ${esc(g[0])}">×</button></div><input type="range" min="0" max="100" value="${g[1]}" data-g="${i}" aria-label="${esc(g[0])}"></div>`).join('')||'<p class="empty">No goals yet. Add one below.</p>')+addf('Add a goal');
- }else{h+=list(cur,cur=='gro')+addf(cur=='gro'?'Add an item':'Add an idea')}
+  h+=(m.g.map((g,i)=>[g,i]).reverse().map(([g,i])=>{const T=g[2]||0,sv=g[3]||0,pc=T?Math.min(100,Math.round(sv/T*100)):g[1];
+   return `<div style="margin:12px 0"><div class="row" style="border:0;padding:0"><label>${esc(g[0])}</label><b>${pc}%</b><button class="x" data-gd="${i}" aria-label="Delete goal ${esc(g[0])}">×</button></div>`+
+   (T?`<div class="bar"><i style="width:${pc}%"></i></div><div class="add"><span class="when2" style="align-self:center;white-space:nowrap">${peso(sv)} of ${peso(T)}</span><input type="number" min="0" step="any" value="${sv}" data-gs="${i}" aria-label="Saved so far for ${esc(g[0])}"></div>`:`<input type="range" min="0" max="100" value="${g[1]}" data-g="${i}" aria-label="${esc(g[0])}">`)+'</div>'}).join('')||'<p class="empty">No goals yet. Add one below.</p>')+
+  `<div class="add wrapit"><input type="text" id="new" placeholder="Add a goal" aria-label="Add a goal"><input type="number" id="tgt" min="0" step="any" placeholder="Target ₱ (optional)" style="width:150px" aria-label="Target amount"><button id="addb">Add</button></div>`;
+ }else{h+=list(cur,cur=='gro')+(cur=='gro'?grof():addf('Add an idea'))+(cur=='gro'?'<div class="mini" style="margin-top:10px"><button data-a="clr">Clear checked items</button></div>':'')}
  const keep=pane.scrollTop,same=lastCur==cur;lastCur=cur;
  pane.innerHTML=h;pane.scrollTop=same?keep:0;if(ready)save();
  if(cur=='alb'&&me)drawGal();
@@ -55,17 +98,22 @@ function render(){
 function draw(){const m=S.chr;let n=m.i;if(m.deck.length>1)while(n==m.i)n=Math.floor(Math.random()*m.deck.length);m.i=n;m.who=Math.random()<.5?'A':'B'}
 function add(){
  if(cur=='dia'){const tx=document.getElementById('dtxt').value.trim();if(!tx){document.getElementById('dtxt').focus();return}
-  S.dia.entries.push([document.getElementById('new').value.trim()||'Untitled',tx,new Date().toISOString()]);openDx=-1;render();return}
+  S.dia.entries.push([document.getElementById('new').value.trim()||'Untitled',tx,new Date().toISOString(),document.getElementById('dmood').value,document.getElementById('dwho').value]);openDx=-1;render();return}
  const m=S[cur],nw=document.getElementById('new');if(!nw)return;const v=nw.value.trim();if(!v)return;
- if(cur=='bud'){const a=+document.getElementById('amt').value;if(!a)return;m.ex.push([v,a,document.getElementById('pb').value,new Date().toISOString()])}
- else if(cur=='cal'){const d=document.getElementById('dt').value;if(!d){document.getElementById('dt').focus();return}m.items.push([v,d])}
- else if(cur=='chr'){m.deck.push(v)}
- else if(cur=='gol'){m.g.push([v,0])}
- else m.items.push([v,0]);
+ if(cur=='bud'){const a=+document.getElementById('amt').value;if(!a)return;bm=ym(new Date());m.ex.push([v,a,document.getElementById('pb').value,new Date().toISOString(),document.getElementById('cat').value])}
+ else if(cur=='cal'){const d=document.getElementById('dt').value;if(!d){document.getElementById('dt').focus();return}m.items.push([v,d,+document.getElementById('rep').value,(document.getElementById('tms').checked&&document.getElementById('tm').value)||'',document.getElementById('ecat').value])}
+ else if(cur=='alb'){m.names=m.names||[];if(!albNames().includes(v))m.names.push(v);curAlb=v}
+ else if(cur=='chr'||cur=='dat'){m.deck.push(v)}
+ else if(cur=='gol'){m.g.push([v,0,+document.getElementById('tgt').value||0,0])}
+ else m.items.push([v,0,cur=='gro'?(+document.getElementById('qty').value||0):0]);
  render()}
 dock.onclick=e=>{const t=e.target.closest('[data-t]');if(t){cur=t.dataset.t;openEx=-1;openDx=-1;render()}};
 pane.onclick=e=>{
  const m=S[cur],t=e.target;
+ const gmb=t.closest('[data-gm]');if(gmb){gm=new Date(gm.getFullYear(),gm.getMonth()+(+gmb.dataset.gm),1);render();return}
+ const al=t.closest('[data-al]');if(al){curAlb=al.dataset.al;favOnly=false;render();return}
+ if(t.closest('[data-ab]')){curAlb=null;render();return}
+ if(t.closest('[data-da]')){m.names=(m.names||[]).filter(n=>n!=curAlb);curAlb=null;render();return}
  const ph=t.closest('[data-ph]');if(ph){openPv(+ph.dataset.ph);return}
  const dd=t.closest('[data-dd]');if(dd){if(confirm('Delete this diary entry?')){m.entries.splice(+dd.dataset.dd,1);openDx=-1;render()}return}
  const dx=t.closest('[data-dx]');if(dx){const i=+dx.dataset.dx;openDx=openDx==i?-1:i;render();return}
@@ -74,12 +122,13 @@ pane.onclick=e=>{
  const ex=t.closest('[data-ex]');if(ex){const i=+ex.dataset.ex;openEx=openEx==i?-1:i;render();return}
  if(t.id=='addb'){add();return}
  const a=t.dataset.a;
- if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else draw();render()}
+ if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){if('Notification' in window)Notification.requestPermission().then(()=>render())}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
 };
 pane.onkeydown=e=>{if(e.key=='Enter'&&e.target.matches('#new,#amt,#dt')){e.preventDefault();add()}};
-pane.onchange=e=>{if(e.target.id=='pick'){const fs=[...e.target.files];e.target.value='';addPhotos(fs);return}
+pane.onchange=e=>{if(e.target.id=='bm'){bm=e.target.value||bm;openEx=-1;render();return}if(e.target.dataset.dn!==undefined){const D=S.dat,t=D.deck[+e.target.dataset.dn];D.done=D.done||[];const j=D.done.indexOf(t);j<0?D.done.push(t):D.done.splice(j,1);render();return}if(e.target.id=='tms'){document.getElementById('tm').disabled=!e.target.checked;return}if(e.target.id=='since'){S.cal.since=e.target.value;render();return}if(e.target.dataset.gs!==undefined){S.gol.g[+e.target.dataset.gs][3]=Math.max(0,+e.target.value||0);render();return}if(e.target.id=='favo'){favOnly=e.target.checked;drawGal();return}if(e.target.id=='lim'){S.bud.lim=Math.max(0,+e.target.value||0);render();return}
+ if(e.target.id=='pick'){const fs=[...e.target.files];e.target.value='';addPhotos(fs);return}
  const d=e.target.dataset;if(d.k){S[d.k].items[d.i][1]=e.target.checked?1:0;e.target.closest('.row').classList.toggle('done',e.target.checked);save()}};
-pane.oninput=e=>{if(e.target.dataset.g!==undefined){S.gol.g[e.target.dataset.g][1]=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=e.target.value+'%';save()}};
+pane.oninput=e=>{if(e.target.id=='dq'){dq=e.target.value;document.getElementById('dl').innerHTML=diaList();return}if(e.target.dataset.g!==undefined){S.gol.g[e.target.dataset.g][1]=+e.target.value;e.target.previousElementSibling.querySelector('b').textContent=e.target.value+'%';save()}};
 render();
 
 /* ---- Firebase: data shared between the two of you ---- */
@@ -87,7 +136,7 @@ const $=id=>document.getElementById(id),dlg=$('dlg'),er=$('err');
 let me=null,mode='in',mem={};
 const st={g(k){try{return localStorage.getItem(k)}catch(e){return mem[k]||null}},s(k,v){try{localStorage.setItem(k,v)}catch(e){mem[k]=v}}};
 const cloud=!!window.FB&&location.protocol!='file:';
-const DEF=JSON.stringify(S),MODS=Object.keys(S).filter(k=>k!='alb');
+const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
 const note=t=>{const n=$('sync');if(n)n.textContent=t};
 const fbErr=x=>({
@@ -154,7 +203,11 @@ function shrink(file,max,q){return new Promise((res,rej)=>{
  img.onerror=()=>{URL.revokeObjectURL(u);rej()};img.src=u})}
 function drawGal(){
  const g=$('gal');if(!g||cur!='alb')return;
- g.innerHTML=photos.map((p,i)=>`<button class="ph" data-ph="${i}" aria-label="Open photo${p.c?': '+esc(p.c):''}"><img src="${p.th}" alt="${esc(p.c||'Our photo')}" loading="lazy"></button>`).join('')||'<p class="empty" style="grid-column:1/-1">No photos yet. Add your first one.</p>'}
+ const of=p=>p.a||'Our photos';
+ if(curAlb==null){
+  g.innerHTML=albNames().reverse().map(n=>{const L=photos.filter(p=>of(p)==n);return `<button class="ph al" data-al="${esc(n)}" aria-label="Open album ${esc(n)}">${L[0]?`<img src="${L[0].th}" alt="">`:''}<span class="cap" style="opacity:1">${esc(n)} · ${L.length}</span></button>`}).join('');return}
+ const L=photos.map((p,i)=>[p,i]).filter(([p])=>of(p)==curAlb&&(!favOnly||p.f));
+ g.innerHTML=L.map(([p,i])=>`<button class="ph" data-ph="${i}" aria-label="Open photo${p.c?': '+esc(p.c):''}"><img src="${p.th}" alt="${esc(p.c||'Our photo')}" loading="lazy">${p.f?'<span class="fv">Favorite</span>':''}${p.c?`<span class="cap">${esc(p.c)}</span>`:''}</button>`).join('')||`<p class="empty" style="grid-column:1/-1">${favOnly?'No favorites yet.':'No photos in this album yet.'}</p>`+(curAlb!='Our photos'&&!photos.some(p=>of(p)==curAlb)?'<button class="btn alt" data-da="1" style="grid-column:1/-1;justify-self:start">Delete this empty album</button>':'')}
 async function addPhotos(files){
  if(!me)return;
  const msg=()=>$('albmsg');let ok=0,bad=0;
@@ -163,7 +216,7 @@ async function addPhotos(files){
    let full=await shrink(f,1100,.72);if(full.length>900000)full=await shrink(f,800,.6);
    if(full.length>950000)throw 0;
    const th=await shrink(f,320,.7),id=Date.now()+'-'+Math.random().toString(36).slice(2,7);
-   FB.putPhoto(me,id,{t:new Date().toISOString(),c:'',th},full).catch(x=>{if(msg())msg().textContent='Could not save a photo: '+fbErr(x)});
+   FB.putPhoto(me,id,{t:new Date().toISOString(),c:'',a:curAlb||'Our photos',th},full).catch(x=>{if(msg())msg().textContent='Could not save a photo: '+fbErr(x)});
    ok++}catch(e){bad++}
   if(msg())msg().textContent='Adding… '+(ok+bad)+' of '+files.length}
  if(msg()&&bad)msg().textContent=bad+' photo(s) could not be added. Try JPG, PNG or WebP.';
@@ -171,11 +224,12 @@ async function addPhotos(files){
 const pv=$('pv');
 async function openPv(i){
  const p=photos[i];if(!p)return;pvi=i;const im=$('pvi');
- im.src=p.th;im.alt=p.c||'Our photo';$('pvd').textContent='Added '+fmtT(p.t);$('pvt').value=p.c||'';pv.showModal();
- try{const d=await FB.getFull(me,p.id);if(d&&pvi==i&&pv.open)im.src=d}catch(e){}}
-function savePv(){const p=photos[pvi];if(!p)return;const c=$('pvt').value.trim();p.c=c;FB.setCaption(me,p.id,c).catch(x=>note(fbErr(x)));pv.close();drawGal()}
+ im.src=p.th;im.alt=p.c||'Our photo';$('pvl').href=p.th;$('pva').innerHTML=albNames().map(n=>`<option ${n==(p.a||'Our photos')?'selected':''}>${esc(n)}</option>`).join('');$('pvf').textContent=p.f?'Remove favorite':'Favorite';$('pvd').textContent='Added '+fmtT(p.t);$('pvt').value=p.c||'';pv.showModal();
+ try{const d=await FB.getFull(me,p.id);if(d&&pvi==i&&pv.open){im.src=d;$('pvl').href=d}}catch(e){}}
+function savePv(){const p=photos[pvi];if(!p)return;const c=$('pvt').value.trim();const a=$('pva').value;if(a!=(p.a||'Our photos')){p.a=a;FB.patchPhoto(me,p.id,{a}).catch(x=>note(fbErr(x)))}p.c=c;FB.setCaption(me,p.id,c).catch(x=>note(fbErr(x)));pv.close();drawGal()}
 $('pvs').onclick=savePv;
 $('pvt').onkeydown=e=>{if(e.key=='Enter'){e.preventDefault();savePv()}};
+$('pvf').onclick=()=>{const p=photos[pvi];if(!p)return;p.f=!p.f;FB.patchPhoto(me,p.id,{f:p.f}).catch(x=>note(fbErr(x)));pv.close();drawGal()};
 $('pvc').onclick=()=>pv.close();
 $('pvx').onclick=()=>{const p=photos[pvi];if(!p||!confirm('Delete this photo?'))return;FB.delPhoto(me,p.id).catch(x=>note(fbErr(x)));pv.close()};
 
@@ -209,3 +263,34 @@ ready=true;loadGuest();
 if(cloud&&st.g('cos_in')=='1'){document.body.classList.add('in');$('authb').textContent='Log out';$('nameb').hidden=false}
 render();
 if(cloud){try{FB.init();FB.onAuth(u=>u?enter(u):leave())}catch(e){note('Could not start the cloud connection.')}}
+
+/* ---- reminders: fire once when an event's time arrives (page or installed app must be open) ---- */
+function toast(msg){const b=document.getElementById('toast');b.textContent=msg;b.hidden=false;clearTimeout(b._t);b._t=setTimeout(()=>b.hidden=true,20000)}
+function checkAlerts(){
+ if(!S.cal||!S.cal.items)return;
+ const now=new Date(),tk=iso(now),mins=now.getHours()*60+now.getMinutes();let done={};
+ try{done=JSON.parse(st.g('cos_notified')||'{}')}catch(e){}
+ S.cal.items.forEach(x=>{
+  if(!occ(x,tk))return;
+  const [H,M]=(x[3]||'08:00').split(':').map(Number),at=H*60+M,id=tk+'|'+x[0]+'|'+x[1]+'|'+(x[3]||'');
+  if(done[id]||mins<at||(x[3]&&mins-at>180))return;
+  done[id]=1;const msg=x[0]+(x[3]?' at '+fmtTm(x[3]):' today');
+  toast('Reminder: '+msg);
+  if('Notification' in window&&Notification.permission=='granted'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}
+ });
+ Object.keys(done).forEach(k=>{if(!k.startsWith(tk))delete done[k]});
+ st.s('cos_notified',JSON.stringify(done))}
+document.getElementById('toast').onclick=e=>{e.currentTarget.hidden=true};
+setTimeout(checkAlerts,1500);setInterval(checkAlerts,20000);
+
+function preAlerts(){
+ if(!S.cal||!S.cal.items)return;
+ const now=new Date(),tk=iso(now),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let done={};
+ if(now.getHours()<8)return;
+ try{done=JSON.parse(st.g('cos_pre')||'{}')}catch(e){}
+ S.cal.items.forEach(x=>{const n=Math.round((nx(x)-t0)/864e5),big=['Anniversary','Birthday','Trip'].includes(x[4]);
+  if(!(n==1||(n==3&&big)))return;const id=tk+'|'+n+'|'+x[0];if(done[id])return;done[id]=1;
+  const msg=(n==1?'Tomorrow: ':'3 days left: ')+x[0];toast(msg);
+  if('Notification' in window&&Notification.permission=='granted'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}});
+ Object.keys(done).forEach(k=>{if(!k.startsWith(tk))delete done[k]});st.s('cos_pre',JSON.stringify(done))}
+setTimeout(preAlerts,2000);setInterval(preAlerts,20000);
