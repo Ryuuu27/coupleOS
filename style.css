@@ -125,3 +125,9 @@ html{overflow-y:scroll}
 @media (hover:none){.cap{opacity:1}}
 .ph.al{background:var(--tealsoft)}
 #pva{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);margin-bottom:8px}
+/* new-item forms sit at the top of each tab, under the heading */
+.pane{display:flex;flex-direction:column}
+.pane>*{order:3;flex:none}
+.pane>h3{order:0}
+.pane>h3+small{order:1}
+.pane>.add,.pane>.top{order:2}

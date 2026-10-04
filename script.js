@@ -90,7 +90,7 @@ function render(){
    return `<div style="margin:12px 0"><div class="row" style="border:0;padding:0"><label>${esc(g[0])}</label><b>${pc}%</b><button class="x" data-gd="${i}" aria-label="Delete goal ${esc(g[0])}">×</button></div>`+
    (T?`<div class="bar"><i style="width:${pc}%"></i></div><div class="add"><span class="when2" style="align-self:center;white-space:nowrap">${peso(sv)} of ${peso(T)}</span><input type="number" min="0" step="any" value="${sv}" data-gs="${i}" aria-label="Saved so far for ${esc(g[0])}"></div>`:`<input type="range" min="0" max="100" value="${g[1]}" data-g="${i}" aria-label="${esc(g[0])}">`)+'</div>'}).join('')||'<p class="empty">No goals yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="text" id="new" placeholder="Add a goal" aria-label="Add a goal"><input type="number" id="tgt" min="0" step="any" placeholder="Target ₱ (optional)" style="width:150px" aria-label="Target amount"><button id="addb">Add</button></div>`;
- }else{h+=list(cur,cur=='gro')+(cur=='gro'?grof():addf('Add an idea'))+(cur=='gro'?'<div class="mini" style="margin-top:10px"><button data-a="clr">Clear checked items</button></div>':'')}
+ }else{h+=list(cur,cur=='gro')+(cur=='gro'?grof():addf('Add an idea'))+(cur=='gro'?'<div class="mini top" style="margin-top:10px"><button data-a="clr">Clear checked items</button></div>':'')}
  const keep=pane.scrollTop,same=lastCur==cur;lastCur=cur;
  pane.innerHTML=h;pane.scrollTop=same?keep:0;if(ready)save();
  if(cur=='alb'&&me)drawGal();
