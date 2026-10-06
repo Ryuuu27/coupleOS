@@ -48,6 +48,19 @@ function notifLine(){if(!('Notification' in window))return '';const p=Notificati
  if(p=='granted'&&!VAPID_KEY)return '<small>Reminders pop up while the app is open. For reminders when it is closed, use the phone calendar buttons below.</small>';
  if(p=='granted'&&st.g('cos_push')=='1')return '<small>Notifications are on for this device, even when the app is closed.</small>';
  return '<div class="mini" style="margin:6px 0"><button data-a="notif">Turn on reminders while the app is open</button></div>'}
+function albNames(){const set=new Set((S.alb&&S.alb.names)||[]);photos.forEach(p=>set.add(p.a||'Our photos'));set.add('Our photos');return [...set]}
+function albUI(){
+ if(curAlb==null)return `<div class="add"><input type="text" id="new" placeholder="New album, e.g. Yesterday's pictures" maxlength="40" aria-label="New album name"><button id="addb">Create</button></div><div class="gal" id="gal"></div>`;
+ return `<div class="add"><button class="x" data-ab="1" aria-label="Back to albums" style="font-size:15px">‹ Albums</button><b style="flex:1">${esc(curAlb)}</b><input type="file" id="pick" class="sr" accept="image/*" multiple><label class="upl" for="pick">Add photos</label></div><label class="when2" style="display:flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="favo" ${favOnly?'checked':''}> Favorites only</label><p id="albmsg" class="empty" role="status" style="padding:0"></p><div class="gal" id="gal"></div>`}
+function homeUI(){
+ const hr=new Date().getHours(),gr=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening',t0=new Date();t0.setHours(0,0,0,0);
+ const up=S.cal.items.map(x=>[x,nx(x)]).filter(([x,d])=>d>=t0&&(d-t0)/864e5<=7).sort((a,b)=>a[1]-b[1]),
+  gro=S.gro.items.filter(x=>!x[1]).length,G=S.gol.g[0],dn=S.dat.deck[S.dat.i],ch=S.chr.deck[S.chr.i],
+  T=G&&G[2]?Math.min(100,Math.round((G[3]||0)/G[2]*100)):G?G[1]:0;
+ const row=(a,b)=>`<div class="row"><span class="when">${a}</span><label style="cursor:default">${b}</label></div>`;
+ return `<h3>${gr}, ${esc(N.A)} & ${esc(N.B)}.</h3><small>This week at a glance</small>`+
+  (up.map(([x,d])=>row(esc(cd(d)),esc(x[0])+(x[3]?' at '+fmtTm(x[3]):'')+(x[4]?` <span class="when2">${esc(x[4])}</span>`:''))).join('')||row('This week','No events coming up'))+
+  row('Groceries',gro+' item'+(gro==1?'':'s')+' remaining')+row('Next chore',ch?esc(ch)+' · '+esc(N[S.chr.who]):'None')+(G?row('Goal',esc(G[0])+' · '+T+'%'):'')+(dn?row('Date night idea',esc(dn)):'')}
 function render(){
  dock.innerHTML=Object.keys(S).map(k=>`<button role="tab" aria-selected="${k==cur}" data-t="${k}">${S[k].n}</button>`).join('');
  const m=S[cur];let h=`<h3>${m.n}</h3><small>${m.sub}</small>`;
