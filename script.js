@@ -44,20 +44,10 @@ function diaList(){
  const rows=m.entries.map((x,i)=>[x,i]).filter(([x])=>!q||(x[0]+' '+x[1]).toLowerCase().includes(q)).sort((p,r)=>r[0][2].localeCompare(p[0][2]));
  return rows.map(([x,i])=>{const o=openDx==i;return `<button class="rowb" data-dx="${i}" aria-expanded="${o}"><label>${esc(x[0])}</label><span class="when2">${esc((x[4]?N[x[4]]+' · ':'')+(x[3]?x[3]+' · ':'')+fmtS(x[2]))}</span><span class="chev" aria-hidden="true"></span></button>`+(o?`<div class="det"><div class="entry">${esc(x[1])}</div><div><span>Written ${esc(fmtT(x[2]))}</span></div><button class="btn alt" style="justify-self:start;padding:8px 16px;font-size:14px" data-dd="${i}">Delete entry</button></div>`:'')}).join('')||'<p class="empty">'+(q?'No entries match your search.':'No entries yet. Write the first one above.')+'</p>'}
 function notifLine(){if(!('Notification' in window))return '';const p=Notification.permission;
- return p=='default'?'<div class="mini" style="margin:6px 0"><button data-a="notif">Turn on reminders</button></div>':p=='denied'?'<small>Browser notifications are blocked. Reminders still pop up on this page.</small>':'<small>Reminders are on. You get one when an event time arrives.</small>'}
-function albNames(){const set=new Set((S.alb&&S.alb.names)||[]);photos.forEach(p=>set.add(p.a||'Our photos'));set.add('Our photos');return [...set]}
-function albUI(){
- if(curAlb==null)return `<div class="add"><input type="text" id="new" placeholder="New album, e.g. Yesterday's pictures" maxlength="40" aria-label="New album name"><button id="addb">Create</button></div><div class="gal" id="gal"></div>`;
- return `<div class="add"><button class="x" data-ab="1" aria-label="Back to albums" style="font-size:15px">‹ Albums</button><b style="flex:1">${esc(curAlb)}</b><input type="file" id="pick" class="sr" accept="image/*" multiple><label class="upl" for="pick">Add photos</label></div><label class="when2" style="display:flex;align-items:center;gap:6px;margin:8px 0"><input type="checkbox" id="favo" ${favOnly?'checked':''}> Favorites only</label><p id="albmsg" class="empty" role="status" style="padding:0"></p><div class="gal" id="gal"></div>`}
-function homeUI(){
- const hr=new Date().getHours(),gr=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening',t0=new Date();t0.setHours(0,0,0,0);
- const up=S.cal.items.map(x=>[x,nx(x)]).filter(([x,d])=>d>=t0&&(d-t0)/864e5<=7).sort((a,b)=>a[1]-b[1]),
-  gro=S.gro.items.filter(x=>!x[1]).length,G=S.gol.g[0],dn=S.dat.deck[S.dat.i],ch=S.chr.deck[S.chr.i],
-  T=G&&G[2]?Math.min(100,Math.round((G[3]||0)/G[2]*100)):G?G[1]:0;
- const row=(a,b)=>`<div class="row"><span class="when">${a}</span><label style="cursor:default">${b}</label></div>`;
- return `<h3>${gr}, ${esc(N.A)} & ${esc(N.B)}.</h3><small>This week at a glance</small>`+
-  (up.map(([x,d])=>row(esc(cd(d)),esc(x[0])+(x[3]?' at '+fmtTm(x[3]):'')+(x[4]?` <span class="when2">${esc(x[4])}</span>`:''))).join('')||row('This week','No events coming up'))+
-  row('Groceries',gro+' item'+(gro==1?'':'s')+' remaining')+row('Next chore',ch?esc(ch)+' · '+esc(N[S.chr.who]):'None')+(G?row('Goal',esc(G[0])+' · '+T+'%'):'')+(dn?row('Date night idea',esc(dn)):'')}
+ if(p=='denied')return '<small>Notifications are blocked in your browser settings. Allow them for this site to get reminders.</small>';
+ if(p=='granted'&&!VAPID_KEY)return '<small>Reminders pop up while the app is open. For reminders when it is closed, use the phone calendar buttons below.</small>';
+ if(p=='granted'&&st.g('cos_push')=='1')return '<small>Notifications are on for this device, even when the app is closed.</small>';
+ return '<div class="mini" style="margin:6px 0"><button data-a="notif">Turn on reminders while the app is open</button></div>'}
 function render(){
  dock.innerHTML=Object.keys(S).map(k=>`<button role="tab" aria-selected="${k==cur}" data-t="${k}">${S[k].n}</button>`).join('');
  const m=S[cur];let h=`<h3>${m.n}</h3><small>${m.sub}</small>`;
@@ -74,8 +64,8 @@ function render(){
   <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="cat" aria-label="Category">${CAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='cal'){
   const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
-  h+=calTop(m)+notifLine();
-  h+=(rows.map(([x,i,d])=>`<div class="row"><span class="when">${esc(fmtD(iso(d)))}</span><label style="cursor:default">${esc(x[0])} <span class="when2">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></label>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
+  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="icsall">Add all events to phone calendar</button></div>';
+  h+=(rows.map(([x,i,d])=>`<div class="row"><span class="when">${esc(fmtD(iso(d)))}</span><label style="cursor:default">${esc(x[0])} <span class="when2">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></label><button class="x" data-ics="${i}" style="font-size:13px;white-space:nowrap" aria-label="Add ${esc(x[0])} to phone calendar">Add to phone</button>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
   h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck · Done so far: ${esc(N.A)} ${(m.tally||{}).A||0}, ${esc(N.B)} ${(m.tally||{}).B||0}</small>`;
@@ -110,6 +100,7 @@ function add(){
 dock.onclick=e=>{const t=e.target.closest('[data-t]');if(t){cur=t.dataset.t;openEx=-1;openDx=-1;render()}};
 pane.onclick=e=>{
  const m=S[cur],t=e.target;
+ const ic=t.closest('[data-ics]');if(ic){dlIcs([m.items[+ic.dataset.ics]],'couple-os-event');return}
  const gmb=t.closest('[data-gm]');if(gmb){gm=new Date(gm.getFullYear(),gm.getMonth()+(+gmb.dataset.gm),1);render();return}
  const al=t.closest('[data-al]');if(al){curAlb=al.dataset.al;favOnly=false;render();return}
  if(t.closest('[data-ab]')){curAlb=null;render();return}
@@ -122,7 +113,7 @@ pane.onclick=e=>{
  const ex=t.closest('[data-ex]');if(ex){const i=+ex.dataset.ex;openEx=openEx==i?-1:i;render();return}
  if(t.id=='addb'){add();return}
  const a=t.dataset.a;
- if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){if('Notification' in window)Notification.requestPermission().then(()=>render())}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
+ if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){enablePush();return}else if(a=='icsall'){dlIcs(m.items,'couple-os-events');return}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
 };
 pane.onkeydown=e=>{if(e.key=='Enter'&&e.target.matches('#new,#amt,#dt')){e.preventDefault();add()}};
 pane.onchange=e=>{if(e.target.id=='bm'){bm=e.target.value||bm;openEx=-1;render();return}if(e.target.dataset.dn!==undefined){const D=S.dat,t=D.deck[+e.target.dataset.dn];D.done=D.done||[];const j=D.done.indexOf(t);j<0?D.done.push(t):D.done.splice(j,1);render();return}if(e.target.id=='tms'){document.getElementById('tm').disabled=!e.target.checked;return}if(e.target.id=='since'){S.cal.since=e.target.value;render();return}if(e.target.dataset.gs!==undefined){S.gol.g[+e.target.dataset.gs][3]=Math.max(0,+e.target.value||0);render();return}if(e.target.id=='favo'){favOnly=e.target.checked;drawGal();return}if(e.target.id=='lim'){S.bud.lim=Math.max(0,+e.target.value||0);render();return}
@@ -276,7 +267,7 @@ function checkAlerts(){
   if(done[id]||mins<at||(x[3]&&mins-at>180))return;
   done[id]=1;const msg=x[0]+(x[3]?' at '+fmtTm(x[3]):' today');
   toast('Reminder: '+msg);
-  if('Notification' in window&&Notification.permission=='granted'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}
+  if('Notification' in window&&Notification.permission=='granted'&&st.g('cos_push')!='1'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}
  });
  Object.keys(done).forEach(k=>{if(!k.startsWith(tk))delete done[k]});
  st.s('cos_notified',JSON.stringify(done))}
@@ -291,6 +282,36 @@ function preAlerts(){
  S.cal.items.forEach(x=>{const n=Math.round((nx(x)-t0)/864e5),big=['Anniversary','Birthday','Trip'].includes(x[4]);
   if(!(n==1||(n==3&&big)))return;const id=tk+'|'+n+'|'+x[0];if(done[id])return;done[id]=1;
   const msg=(n==1?'Tomorrow: ':'3 days left: ')+x[0];toast(msg);
-  if('Notification' in window&&Notification.permission=='granted'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}});
+  if('Notification' in window&&Notification.permission=='granted'&&st.g('cos_push')!='1'){try{new Notification('Couple OS reminder',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}});
  Object.keys(done).forEach(k=>{if(!k.startsWith(tk))delete done[k]});st.s('cos_pre',JSON.stringify(done))}
 setTimeout(preAlerts,2000);setInterval(preAlerts,20000);
+
+/* ---- push notifications that arrive even when the app is closed ---- */
+// Paste your Web Push key here: Firebase console > Project settings > Cloud Messaging > Web Push certificates > Generate key pair
+const VAPID_KEY='';
+async function enablePush(){
+ if(!('Notification' in window))return;
+ const p=await Notification.requestPermission();
+ if(p=='granted'){
+  if(!me)note('Log in first, then turn on notifications.');
+  else if(!cloud||!VAPID_KEY)note('Reminders are on while the app is open.');
+  else{try{await FB.enablePush(me,VAPID_KEY,'firebase-messaging-sw.js');st.s('cos_push','1');note('Notifications are on for this device.')}catch(e){note('Could not turn on notifications: '+(e.message||e.code))}}}
+ render()}
+
+/* ---- add events to the phone's own calendar (.ics file); the phone then does the reminding ---- */
+function icsFor(list){
+ const z=n=>String(n).padStart(2,'0'),e2=t=>String(t).replace(/[\\;,]/g,'\\$&').replace(/\n/g,'\\n'),stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+ const al=(t,txt)=>'BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:'+txt+'\r\nTRIGGER:'+t+'\r\nEND:VALARM\r\n';
+ const ev=list.map(x=>{
+  const d=x[1].replace(/-/g,''),big=['Anniversary','Birthday','Trip'].includes(x[4]);
+  let o='BEGIN:VEVENT\r\nUID:'+(x[1]+x[0]).replace(/[^a-z0-9]/gi,'')+'@couple-os\r\nDTSTAMP:'+stamp+'\r\nSUMMARY:'+e2(x[0])+'\r\n';
+  if(x[3]){const [h,m]=x[3].split(':');o+='DTSTART:'+d+'T'+h+m+'00\r\nDURATION:PT1H\r\n'}else o+='DTSTART;VALUE=DATE:'+d+'\r\n';
+  if(x[2])o+='RRULE:FREQ='+(x[2]==2?'YEARLY':'MONTHLY')+'\r\n';
+  o+=al(x[3]?'PT0S':'PT8H',e2(x[0]))+al(x[3]?'-P1D':'-PT16H','Tomorrow: '+e2(x[0]));
+  if(big)o+=al(x[3]?'-P3D':'-P2DT16H','3 days left: '+e2(x[0]));
+  return o+'END:VEVENT\r\n'}).join('');
+ return 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Couple OS//EN\r\nCALSCALE:GREGORIAN\r\n'+ev+'END:VCALENDAR\r\n'}
+function dlIcs(list,name){
+ if(!list.length)return;
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([icsFor(list)],{type:'text/calendar'}));a.download=name+'.ics';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
