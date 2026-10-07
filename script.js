@@ -143,6 +143,7 @@ const cloud=!!window.FB&&location.protocol!='file:';
 const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
 let gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
+const REDIR=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||!!navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 const GOOGLE_CLIENT_ID='918904043726-hho2k3cr47b7uoj728te7la4d86b2k2v.apps.googleusercontent.com';/* paste your Google OAuth client ID here (see setup steps) */
 const note=t=>{const n=$('sync');if(n)n.textContent=t};
 const fbErr=x=>({
@@ -339,11 +340,15 @@ function dlIcs(list,name){
 function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const t=document.createElement('script');t.src='https://accounts.google.com/gsi/client';t.onload=res;t.onerror=()=>rej(new Error('Could not load Google sign-in. Are you offline?'));document.head.appendChild(t)})}
 async function gToken(interactive){
  if(gTok&&Date.now()<gExp-60000)return gTok;
- await gLoad();
+ if(REDIR){
+  if(!interactive)throw new Error('Tap "Sync Google Calendar" to reconnect.');
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+new URLSearchParams({client_id:GOOGLE_CLIENT_ID,redirect_uri:location.origin,response_type:'token',scope:'https://www.googleapis.com/auth/calendar.events',include_granted_scopes:'true',state:'cosg'});
+  return new Promise(()=>{})}
+ if(!(window.google&&google.accounts&&google.accounts.oauth2))await gLoad();
  return new Promise((res,rej)=>{
   gClient=gClient||google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'https://www.googleapis.com/auth/calendar.events',callback:()=>{}});
-  gClient.callback=r=>{if(r.error)return rej(new Error(r.error));gTok=r.access_token;gExp=Date.now()+r.expires_in*1000;res(gTok)};
-  gClient.error_callback=e=>rej(new Error('Tap "Sync Google Calendar" to reconnect.'));
+  gClient.callback=r=>{if(r.error)return rej(new Error(r.error));if(!google.accounts.oauth2.hasGrantedAllScopes(r,'https://www.googleapis.com/auth/calendar.events'))return rej(new Error('Calendar permission was not granted. On the Google screen, tick the calendar permission box.'));gTok=r.access_token;gExp=Date.now()+r.expires_in*1000;res(gTok)};
+  gClient.error_callback=e=>rej(new Error(e&&e.type=='popup_failed_to_open'?'The sign-in window was blocked. Allow pop-ups for this site in Safari settings, then tap Sync again.':'Sign-in was closed or not finished. Tap "Sync Google Calendar" to try again.'));
   gClient.requestAccessToken({prompt:interactive?'consent':''})})}
 async function gApi(path,opt){
  const r=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/'+path,Object.assign({headers:{Authorization:'Bearer '+gTok,'Content-Type':'application/json'}},opt));
@@ -362,6 +367,7 @@ function gBody(x){
  b.reminders={useDefault:false,overrides:ov.map(minutes=>({method:'popup',minutes}))};
  return b}
 async function gSync(interactive){
+ if(!me||!synced){if(interactive)note('Log in and wait for your calendar to load, then try again.');return}
  if(!GOOGLE_CLIENT_ID){note('Google sync is not set up yet. Add the client ID in script.js.');return}
  try{
   await gToken(interactive);
@@ -372,8 +378,8 @@ async function gSync(interactive){
   for(const [id,x] of want){const b=JSON.stringify(gBody(x));
    if(hv.has(id))await gApi('events/'+id,{method:'PUT',body:b});
    else{try{await gApi('events',{method:'POST',body:b})}catch(e){if(e.status==409)await gApi('events/'+id,{method:'PUT',body:b});else throw e}}}
-  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);note('Google Calendar is up to date.');
- }catch(e){note('Google Calendar sync failed: '+(e.message||e))}}
+  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);note('Google Calendar is up to date.');toast('Google Calendar is connected and up to date.');
+ }catch(e){const m=e.status==403?'Google blocked this. Make sure the Google Calendar API is enabled in Google Cloud, then try again. ('+(e.message||'')+')':(e.message||String(e));note('Google Calendar sync failed: '+m);if(interactive)toast('Google Calendar: '+m)}}
 
 /* ---- what changed in the calendar since you last looked ---- */
 function calDiff(a,b){
@@ -384,3 +390,15 @@ function calDiff(a,b){
  return [p('Added',add),p('Changed',chg),p('Removed',del)].filter(Boolean).join(' · ')}
 /* reconnect Google Calendar on the first tap after opening the site (browsers only allow the sign-in check after a tap) */
 if(GOOGLE_CLIENT_ID&&st.g('cos_g')=='1')document.addEventListener('pointerdown',()=>{gLast=undefined;gSync(false)},{once:true});
+
+/* load Google sign-in early so the sign-in window opens straight from your tap (iPhone Safari needs this) */
+if(GOOGLE_CLIENT_ID)gLoad().catch(()=>{});
+
+/* coming back from Google's full-page sign-in (iPhone / Home Screen app): pick up the token from the address */
+(function(){
+ const h=new URLSearchParams(location.hash.slice(1));
+ if(h.get('state')!='cosg')return;
+ history.replaceState(null,'',location.pathname+location.search);
+ if(h.get('access_token')&&(h.get('scope')||'').includes('calendar.events')){
+  gTok=h.get('access_token');gExp=Date.now()+(+h.get('expires_in')||3600)*1000;st.s('cos_g','1');gLast=undefined}
+ else setTimeout(()=>toast(h.get('access_token')?'Calendar permission was not granted. Tick the calendar box on the Google screen.':'Google sign-in did not finish ('+(h.get('error')||'cancelled')+').'),800)})();
