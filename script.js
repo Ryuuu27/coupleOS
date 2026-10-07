@@ -77,7 +77,7 @@ function render(){
   <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="cat" aria-label="Category">${CAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='cal'){
   const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
-  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="icsall">Add all events to phone calendar</button><button data-a="sub">Auto-update link</button></div>';
+  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="icsall">Add all events to phone calendar</button><button data-a="gsync">Sync Google Calendar</button><button data-a="sub">Auto-update link</button></div>';
   h+=(rows.map(([x,i,d])=>`<div class="row"><span class="when">${esc(fmtD(iso(d)))}</span><label style="cursor:default">${esc(x[0])} <span class="when2">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></label><button class="x" data-ics="${i}" style="font-size:13px;white-space:nowrap" aria-label="Add ${esc(x[0])} to phone calendar">Add to phone</button>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
@@ -126,7 +126,7 @@ pane.onclick=e=>{
  const ex=t.closest('[data-ex]');if(ex){const i=+ex.dataset.ex;openEx=openEx==i?-1:i;render();return}
  if(t.id=='addb'){add();return}
  const a=t.dataset.a;
- if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){enablePush();return}else if(a=='icsall'){dlIcs(m.items,'couple-os-events');return}else if(a=='sub'){if(!me){note('Log in first.');return}const u=location.origin+'/cal-'+me+'.ics';(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>note('Link copied. Subscribe to it in your phone calendar.'),()=>prompt('Copy this link and subscribe to it in your phone calendar:',u));return}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
+ if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){enablePush();return}else if(a=='gsync'){gSync(true);return}else if(a=='icsall'){dlIcs(m.items,'couple-os-events');return}else if(a=='sub'){if(!me){note('Log in first.');return}const u=location.origin+'/cal-'+me+'.ics';(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>note('Link copied. Subscribe to it in your phone calendar.'),()=>prompt('Copy this link and subscribe to it in your phone calendar:',u));return}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
 };
 pane.onkeydown=e=>{if(e.key=='Enter'&&e.target.matches('#new,#amt,#dt')){e.preventDefault();add()}};
 pane.onchange=e=>{if(e.target.id=='bm'){bm=e.target.value||bm;openEx=-1;render();return}if(e.target.dataset.dn!==undefined){const D=S.dat,t=D.deck[+e.target.dataset.dn];D.done=D.done||[];const j=D.done.indexOf(t);j<0?D.done.push(t):D.done.splice(j,1);render();return}if(e.target.id=='tms'){document.getElementById('tm').disabled=!e.target.checked;return}if(e.target.id=='since'){S.cal.since=e.target.value;render();return}if(e.target.dataset.gs!==undefined){S.gol.g[+e.target.dataset.gs][3]=Math.max(0,+e.target.value||0);render();return}if(e.target.id=='favo'){favOnly=e.target.checked;drawGal();return}if(e.target.id=='lim'){S.bud.lim=Math.max(0,+e.target.value||0);render();return}
@@ -142,6 +142,8 @@ const st={g(k){try{return localStorage.getItem(k)}catch(e){return mem[k]||null}}
 const cloud=!!window.FB&&location.protocol!='file:';
 const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
+let gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
+const GOOGLE_CLIENT_ID='918904043726-hho2k3cr47b7uoj728te7la4d86b2k2v.apps.googleusercontent.com';/* paste your Google OAuth client ID here (see setup steps) */
 const note=t=>{const n=$('sync');if(n)n.textContent=t};
 const fbErr=x=>({
  'auth/email-already-in-use':'That email already has an account. Try logging in.',
@@ -166,6 +168,8 @@ function typing(){const a=document.activeElement;return !!(a&&pane.contains(a)&&
 function save(){
  if(!me){st.s('cos_d2_guest',JSON.stringify(S));return}
  if(!synced)return;
+ st.s('cos_seen',JSON.stringify(S.cal.items));
+ if(GOOGLE_CLIENT_ID&&st.g('cos_g')=='1'){const c=JSON.stringify(S.cal.items);if(c!==gLast){gLast=c;clearTimeout(gTimer);gTimer=setTimeout(()=>gSync(false),1500)}}
  clearTimeout(timer);timer=setTimeout(push,400)}
 function push(){
  const patch={};
@@ -177,10 +181,12 @@ function push(){
 function onCouple(r){
  if(r.err){note(fbErr(r.err));return}
  if(!r.exists){if(r.fromCache)return;synced=true;push();note('Synced. You both see the same dashboard.');return}
- const d=r.data;let changed=false;
+ const d=r.data;let changed=false;const prevCal=!synced?st.g('cos_seen'):JSON.stringify(S.cal.items);
  if(d.na&&d.nb&&(N.A!=d.na||N.B!=d.nb)){N.A=d.na;N.B=d.nb;changed=true}
  MODS.forEach(k=>{const v=d['m_'+k];if(typeof v=='string'&&v!==last[k]){try{S[k]=JSON.parse(v);last[k]=v;changed=true}catch(e){}}});
  const first=!synced;synced=true;
+ {let msg='';try{msg=prevCal?calDiff(JSON.parse(prevCal),S.cal.items):''}catch(e){}if(msg){toast('Calendar updated. '+msg);if('Notification' in window&&Notification.permission=='granted'){try{new Notification('Couple OS',{body:msg,icon:'android-chrome-192x192.png'})}catch(e){}}}}
+ st.s('cos_seen',JSON.stringify(S.cal.items));
  note(r.fromCache?'Offline. Changes will sync when you reconnect.':'Synced. You both see the same dashboard.');
  setHi();
  if(first){push();render()}else if(changed&&!typing())render()}
@@ -328,3 +334,53 @@ function dlIcs(list,name){
  if(!list.length)return;
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([icsFor(list)],{type:'text/calendar'}));a.download=name+'.ics';
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+
+/* ---- sync events straight into the person's Google Calendar (add, change and delete) ---- */
+function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const t=document.createElement('script');t.src='https://accounts.google.com/gsi/client';t.onload=res;t.onerror=()=>rej(new Error('Could not load Google sign-in. Are you offline?'));document.head.appendChild(t)})}
+async function gToken(interactive){
+ if(gTok&&Date.now()<gExp-60000)return gTok;
+ await gLoad();
+ return new Promise((res,rej)=>{
+  gClient=gClient||google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:'https://www.googleapis.com/auth/calendar.events',callback:()=>{}});
+  gClient.callback=r=>{if(r.error)return rej(new Error(r.error));gTok=r.access_token;gExp=Date.now()+r.expires_in*1000;res(gTok)};
+  gClient.error_callback=e=>rej(new Error('Tap "Sync Google Calendar" to reconnect.'));
+  gClient.requestAccessToken({prompt:interactive?'consent':''})})}
+async function gApi(path,opt){
+ const r=await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/'+path,Object.assign({headers:{Authorization:'Bearer '+gTok,'Content-Type':'application/json'}},opt));
+ if(r.status==204)return {};
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok){const e=new Error((j.error&&j.error.message)||('Error '+r.status));e.status=r.status;throw e}
+ return j}
+const gid=x=>{const t=x[0]+'|'+x[1];let a=5381,b=0;for(const c of t){a=((a*33)^c.charCodeAt(0))>>>0;b=((b*31)+c.charCodeAt(0))>>>0}return 'cos'+a.toString(16).padStart(8,'0')+b.toString(16).padStart(8,'0')};
+function gBody(x){
+ const big=['Anniversary','Birthday','Trip'].includes(x[4]),tz=Intl.DateTimeFormat().resolvedOptions().timeZone,p2=n=>String(n).padStart(2,'0');
+ const b={id:gid(x),summary:x[0],description:x[4]||'',status:'confirmed',extendedProperties:{private:{cos:'1'}}};
+ let ov;
+ if(x[3]){const [h,m]=x[3].split(':').map(Number);b.start={dateTime:x[1]+'T'+x[3]+':00',timeZone:tz};b.end={dateTime:x[1]+'T'+(h<23?p2(h+1)+':'+p2(m):'23:59')+':00',timeZone:tz};ov=[0,1440].concat(big?[4320]:[])}
+ else{const d=new Date(x[1]+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+1);b.start={date:x[1]};b.end={date:d.toISOString().slice(0,10)};ov=[960].concat(big?[3840]:[])}
+ if(x[2])b.recurrence=['RRULE:FREQ='+(x[2]==2?'YEARLY':'MONTHLY')];
+ b.reminders={useDefault:false,overrides:ov.map(minutes=>({method:'popup',minutes}))};
+ return b}
+async function gSync(interactive){
+ if(!GOOGLE_CLIENT_ID){note('Google sync is not set up yet. Add the client ID in script.js.');return}
+ try{
+  await gToken(interactive);
+  const want=new Map(S.cal.items.map(x=>[gid(x),x]));let have=[],pt;
+  do{const j=await gApi('events?privateExtendedProperty=cos%3D1&maxResults=250&showDeleted=false'+(pt?'&pageToken='+pt:''));have=have.concat(j.items||[]);pt=j.nextPageToken}while(pt);
+  const hv=new Set(have.map(e=>e.id));
+  for(const e of have)if(!want.has(e.id))await gApi('events/'+e.id,{method:'DELETE'});
+  for(const [id,x] of want){const b=JSON.stringify(gBody(x));
+   if(hv.has(id))await gApi('events/'+id,{method:'PUT',body:b});
+   else{try{await gApi('events',{method:'POST',body:b})}catch(e){if(e.status==409)await gApi('events/'+id,{method:'PUT',body:b});else throw e}}}
+  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);note('Google Calendar is up to date.');
+ }catch(e){note('Google Calendar sync failed: '+(e.message||e))}}
+
+/* ---- what changed in the calendar since you last looked ---- */
+function calDiff(a,b){
+ const m=l=>new Map(l.map(x=>[x[0],JSON.stringify(x)])),A=m(a),B=m(b),add=[],del=[],chg=[];
+ B.forEach((v,k)=>{if(!A.has(k))add.push(k);else if(A.get(k)!==v)chg.push(k)});
+ A.forEach((v,k)=>{if(!B.has(k))del.push(k)});
+ const p=(w,l)=>l.length?w+' '+l.slice(0,3).join(', ')+(l.length>3?' +'+(l.length-3):''):'';
+ return [p('Added',add),p('Changed',chg),p('Removed',del)].filter(Boolean).join(' · ')}
+/* reconnect Google Calendar on the first tap after opening the site (browsers only allow the sign-in check after a tap) */
+if(GOOGLE_CLIENT_ID&&st.g('cos_g')=='1')document.addEventListener('pointerdown',()=>{gLast=undefined;gSync(false)},{once:true});
