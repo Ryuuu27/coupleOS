@@ -87,6 +87,7 @@ function render(){
  }else if(cur=='dia'){
   h+=`<input type="search" id="dq" placeholder="Search entries" aria-label="Search entries" value="${esc(dq)}" style="width:100%;margin:8px 0;font:inherit;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><div class="add" style="flex-direction:column"><input type="text" id="new" placeholder="Title (optional)" maxlength="80" aria-label="Title"><textarea id="dtxt" rows="4" placeholder="Dear diary…" aria-label="Diary entry"></textarea><div class="add wrapit"><select id="dwho" aria-label="Written by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><select id="dmood" aria-label="Mood">${['Happy','Calm','Excited','Grateful','Tired','Sad'].map(c=>`<option>${c}</option>`).join('')}</select></div><button id="addb" style="padding:12px">Save entry</button></div><div id="dl" style="margin-top:10px">${diaList()}</div>`;
  }else if(cur=='alb'){
+  if(me)startPhotos();
   h+=me?albUI():`<p class="empty">Log in or create an account to keep your photos. They are saved to your shared cloud album.</p>`;
  }else if(cur=='gol'){
   h+=(m.g.map((g,i)=>[g,i]).reverse().map(([g,i])=>{const T=g[2]||0,sv=g[3]||0,pc=T?Math.min(100,Math.round(sv/T*100)):g[1];
@@ -192,12 +193,13 @@ function onCouple(r){
  setHi();
  if(first){push();render()}else if(changed&&!typing())render()}
 
+function startPhotos(){if(unsubP||!me)return;unsubP=FB.watchPhotos(me,(list,err)=>{if(err){note(fbErr(err));return}photos=list;drawGal()})}
 function enter(u){
  me=u.uid;synced=false;last={};resetS();st.s('cos_in','1');
  document.body.classList.add('in');$('authb').textContent='Log out';$('nameb').hidden=false;setHi();note('Connecting…');
  unsubC&&unsubC();unsubP&&unsubP();
  unsubC=FB.watchCouple(me,onCouple);
- unsubP=FB.watchPhotos(me,(list,err)=>{if(err){note(fbErr(err));return}photos=list;drawGal()});
+ unsubP=null;
  render()}
 function leave(){
  unsubC&&unsubC();unsubP&&unsubP();unsubC=unsubP=null;clearTimeout(timer);
@@ -392,7 +394,7 @@ function calDiff(a,b){
 if(GOOGLE_CLIENT_ID&&st.g('cos_g')=='1')document.addEventListener('pointerdown',()=>{gLast=undefined;gSync(false)},{once:true});
 
 /* load Google sign-in early so the sign-in window opens straight from your tap (iPhone Safari needs this) */
-if(GOOGLE_CLIENT_ID)gLoad().catch(()=>{});
+if(GOOGLE_CLIENT_ID&&navigator.onLine)gLoad().catch(()=>{});
 
 /* coming back from Google's full-page sign-in (iPhone / Home Screen app): pick up the token from the address */
 (function(){

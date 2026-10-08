@@ -1,6 +1,6 @@
 // Keeps a copy of Couple OS on the phone so it opens with no internet,
 // and (if push is ever turned on) shows reminders sent from the server.
-const C = "couple-os-v1";
+const C = "couple-os-v2";
 const SHELL = ["./", "index.html", "style.css", "script.js", "firebase-bundle.js", "hero.jpg", "site.webmanifest",
   "favicon.ico", "android-chrome-192x192.png", "privacy.html"];
 
@@ -15,14 +15,19 @@ self.addEventListener("activate", e => {
     .then(() => clients.claim()));
 });
 
-// online: always fetch the newest files and refresh the copy; offline: use the saved copy
+// open instantly from the saved copy (no waiting for the network), and update the copy quietly
+// in the background, so a new version shows the next time you open the app
 self.addEventListener("fetch", e => {
   const r = e.request;
   if (r.method !== "GET" || new URL(r.url).origin !== location.origin) return;
-  e.respondWith(fetch(r).then(res => {
-    if (res.ok) { const copy = res.clone(); caches.open(C).then(c => c.put(r, copy)); }
-    return res;
-  }).catch(() => caches.match(r).then(m => m || (r.mode === "navigate" ? caches.match("index.html") : Response.error()))));
+  e.respondWith(caches.match(r, { ignoreSearch: true }).then(hit => {
+    const net = fetch(r).then(res => {
+      if (res.ok) { const copy = res.clone(); caches.open(C).then(c => c.put(r, copy)); }
+      return res;
+    }).catch(() => null);
+    e.waitUntil(net);
+    return hit || net.then(res => res || (r.mode === "navigate" ? caches.match("index.html") : Response.error()));
+  }));
 });
 
 self.addEventListener("push", e => {
