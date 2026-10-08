@@ -315,7 +315,7 @@ async function enablePush(){
  if(p=='granted'){
   if(!me)note('Log in first, then turn on notifications.');
   else if(!cloud||!VAPID_KEY)note('Reminders are on while the app is open.');
-  else{try{await FB.enablePush(me,VAPID_KEY,'firebase-messaging-sw.js');st.s('cos_push','1');note('Notifications are on for this device.')}catch(e){note('Could not turn on notifications: '+(e.message||e.code))}}}
+  else{try{await FB.enablePush(me,VAPID_KEY,'sw.js');st.s('cos_push','1');note('Notifications are on for this device.')}catch(e){note('Could not turn on notifications: '+(e.message||e.code))}}}
  render()}
 
 /* ---- add events to the phone's own calendar (.ics file); the phone then does the reminding ---- */
@@ -402,3 +402,6 @@ if(GOOGLE_CLIENT_ID)gLoad().catch(()=>{});
  if(h.get('access_token')&&(h.get('scope')||'').includes('calendar.events')){
   gTok=h.get('access_token');gExp=Date.now()+(+h.get('expires_in')||3600)*1000;st.s('cos_g','1');gLast=undefined}
  else setTimeout(()=>toast(h.get('access_token')?'Calendar permission was not granted. Tick the calendar box on the Google screen.':'Google sign-in did not finish ('+(h.get('error')||'cancelled')+').'),800)})();
+
+/* save the app on the device so it opens with no internet */
+if('serviceWorker' in navigator&&location.protocol!='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
