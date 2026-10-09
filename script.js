@@ -77,8 +77,8 @@ function render(){
   <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="cat" aria-label="Category">${CAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='cal'){
   const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
-  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="icsall">Add all events to phone calendar</button><button data-a="gsync">Sync Google Calendar</button><button data-a="sub">Auto-update link</button></div>';
-  h+=(rows.map(([x,i,d])=>`<div class="row"><span class="when">${esc(fmtD(iso(d)))}</span><label style="cursor:default">${esc(x[0])} <span class="when2">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></label><button class="x" data-ics="${i}" style="font-size:13px;white-space:nowrap" aria-label="Add ${esc(x[0])} to phone calendar">Add to phone</button>${delb(i,x[0])}</div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
+  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="gsync">Sync Google Calendar</button><button data-a="ght">Instant sync setup</button></div>';
+  h+=(rows.map(([x,i,d])=>`<div class="row evr"><div class="evt"><span class="evd">${esc(fmtD(iso(d)))}</span><b>${esc(x[0])}</b><span class="evm">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></div><div class="eva">${delb(i,x[0])}</div></div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
   h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck · Done so far: ${esc(N.A)} ${(m.tally||{}).A||0}, ${esc(N.B)} ${(m.tally||{}).B||0}</small>`;
@@ -127,7 +127,7 @@ pane.onclick=e=>{
  const ex=t.closest('[data-ex]');if(ex){const i=+ex.dataset.ex;openEx=openEx==i?-1:i;render();return}
  if(t.id=='addb'){add();return}
  const a=t.dataset.a;
- if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){enablePush();return}else if(a=='gsync'){gSync(true);return}else if(a=='icsall'){dlIcs(m.items,'couple-os-events');return}else if(a=='sub'){if(!me){note('Log in first.');return}const u=location.origin+'/cal-'+me+'.ics';(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>note('Link copied. Subscribe to it in your phone calendar.'),()=>prompt('Copy this link and subscribe to it in your phone calendar:',u));return}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
+ if(a){if(a=='swap')m.who=m.who=='A'?'B':'A';else if(a=='notif'){enablePush();return}else if(a=='gsync'){gSync(true);return}else if(a=='ght'){if(me)setSyncToken();return}else if(a=='icsall'){dlIcs(m.items,'couple-os-events');return}else if(a=='sub'){if(!me){note('Log in first.');return}const u=location.origin+'/cal-'+me+'.ics';(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>note('Link copied. Subscribe to it in your phone calendar.'),()=>prompt('Copy this link and subscribe to it in your phone calendar:',u));return}else if(a=='clr')m.items=m.items.filter(x=>!x[1]);else if(a=='pick'||a=='dmark'){m.done=m.done||[];if(a=='dmark'&&m.deck[m.i]&&!m.done.includes(m.deck[m.i]))m.done.push(m.deck[m.i]);const pool=m.deck.map((t,i)=>i).filter(i=>i!=m.i&&!m.done.includes(m.deck[i]));if(pool.length)m.i=pool[Math.floor(Math.random()*pool.length)]}else{if(a=='done'){m.tally=m.tally||{A:0,B:0};m.tally[m.who]++}draw()}render()}
 };
 pane.onkeydown=e=>{if(e.key=='Enter'&&e.target.matches('#new,#amt,#dt')){e.preventDefault();add()}};
 pane.onchange=e=>{if(e.target.id=='bm'){bm=e.target.value||bm;openEx=-1;render();return}if(e.target.dataset.dn!==undefined){const D=S.dat,t=D.deck[+e.target.dataset.dn];D.done=D.done||[];const j=D.done.indexOf(t);j<0?D.done.push(t):D.done.splice(j,1);render();return}if(e.target.id=='tms'){document.getElementById('tm').disabled=!e.target.checked;return}if(e.target.id=='since'){S.cal.since=e.target.value;render();return}if(e.target.dataset.gs!==undefined){S.gol.g[+e.target.dataset.gs][3]=Math.max(0,+e.target.value||0);render();return}if(e.target.id=='favo'){favOnly=e.target.checked;drawGal();return}if(e.target.id=='lim'){S.bud.lim=Math.max(0,+e.target.value||0);render();return}
@@ -143,6 +143,7 @@ const st={g(k){try{return localStorage.getItem(k)}catch(e){return mem[k]||null}}
 const cloud=!!window.FB&&location.protocol!='file:';
 const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
+let GHT='';const GH_SYNC_REPO='Ryuuu27/couple-os-sync';/* the public repo that holds the Google sync job */
 let gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
 const REDIR=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||!!navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 const GOOGLE_CLIENT_ID='918904043726-hho2k3cr47b7uoj728te7la4d86b2k2v.apps.googleusercontent.com';/* paste your Google OAuth client ID here (see setup steps) */
@@ -178,12 +179,12 @@ function push(){
  MODS.forEach(k=>{const v=JSON.stringify(S[k]);if(v!==last[k])patch['m_'+k]=v});
  const f=Object.keys(patch);if(!f.length||!me)return;
  f.forEach(x=>last[x.slice(2)]=patch[x]);
- FB.patchCouple(me,patch).catch(x=>{f.forEach(y=>delete last[y.slice(2)]);note(fbErr(x))})}
+ FB.patchCouple(me,patch).then(()=>{if(patch.m_cal)runSync()}).catch(x=>{f.forEach(y=>delete last[y.slice(2)]);note(fbErr(x))})}
 
 function onCouple(r){
  if(r.err){note(fbErr(r.err));return}
  if(!r.exists){if(r.fromCache)return;synced=true;push();note('Synced. You both see the same dashboard.');return}
- const d=r.data;let changed=false;const prevCal=!synced?st.g('cos_seen'):JSON.stringify(S.cal.items);
+ const d=r.data;GHT=typeof d.ght=='string'?d.ght:'';let changed=false;const prevCal=!synced?st.g('cos_seen'):JSON.stringify(S.cal.items);
  if(d.na&&d.nb&&(N.A!=d.na||N.B!=d.nb)){N.A=d.na;N.B=d.nb;changed=true}
  MODS.forEach(k=>{const v=d['m_'+k];if(typeof v=='string'&&v!==last[k]){try{S[k]=JSON.parse(v);last[k]=v;changed=true}catch(e){}}});
  const first=!synced;synced=true;
@@ -407,3 +408,13 @@ if(GOOGLE_CLIENT_ID&&navigator.onLine)gLoad().catch(()=>{});
 
 /* save the app on the device so it opens with no internet */
 if('serviceWorker' in navigator&&location.protocol!='file:')window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+/* ---- instant calendar update: right after a calendar change is saved, start the cloud sync job straight away ---- */
+function setSyncToken(){
+ const t=prompt('Paste your GitHub token for instant calendar sync. Leave it empty to turn instant sync off.','');
+ if(t===null)return;
+ FB.patchCouple(me,{ght:t.trim()}).then(()=>{GHT=t.trim();note(GHT?'Instant sync is on. Both of you use the same token.':'Instant sync is off.')}).catch(x=>note(fbErr(x)))}
+function runSync(){
+ if(!GHT)return;
+ fetch('https://api.github.com/repos/'+GH_SYNC_REPO+'/actions/workflows/google-sync.yml/dispatches',{method:'POST',keepalive:true,headers:{Authorization:'Bearer '+GHT,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})})
+  .then(r=>{if(!r.ok)note('Instant sync could not start (GitHub error '+r.status+'). Check the token.')}).catch(()=>{})}
