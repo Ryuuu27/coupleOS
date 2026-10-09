@@ -144,7 +144,7 @@ const cloud=!!window.FB&&location.protocol!='file:';
 const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
 let GHT='';const GH_SYNC_REPO='Ryuuu27/couple-os-sync';/* the public repo that holds the Google sync job */
-let gWhen='',gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
+let gNeed=false,gWhen='',gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
 const REDIR=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||!!navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 const GOOGLE_CLIENT_ID='918904043726-hho2k3cr47b7uoj728te7la4d86b2k2v.apps.googleusercontent.com';/* paste your Google OAuth client ID here (see setup steps) */
 const note=t=>{const n=$('sync');if(n)n.textContent=t};
@@ -343,6 +343,7 @@ function dlIcs(list,name){
 function gLoad(){return new Promise((res,rej)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return res();const t=document.createElement('script');t.src='https://accounts.google.com/gsi/client';t.onload=res;t.onerror=()=>rej(new Error('Could not load Google sign-in. Are you offline?'));document.head.appendChild(t)})}
 async function gToken(interactive){
  if(gTok&&Date.now()<gExp-60000)return gTok;
+ if(!interactive){const e=new Error('reconnect');e.reconnect=true;throw e}
  if(REDIR){
   if(!interactive)throw new Error('Tap "Sync Google Calendar" to reconnect.');
   location.href='https://accounts.google.com/o/oauth2/v2/auth?'+new URLSearchParams({client_id:GOOGLE_CLIENT_ID,redirect_uri:location.origin,response_type:'token',scope:'https://www.googleapis.com/auth/calendar.events',include_granted_scopes:'true',state:'cosg'});
@@ -381,8 +382,8 @@ async function gSync(interactive){
   for(const [id,x] of want){const b=JSON.stringify(gBody(x));
    if(hv.has(id))await gApi('events/'+id,{method:'PUT',body:b});
    else{try{await gApi('events',{method:'POST',body:b})}catch(e){if(e.status==409)await gApi('events/'+id,{method:'PUT',body:b});else throw e}}}
-  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);gWhen=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(cur=='cal')render();note('Google Calendar is up to date.');toast('Google Calendar is connected and up to date.');
- }catch(e){const m=e.status==403?'Google blocked this. Make sure the Google Calendar API is enabled in Google Cloud, then try again. ('+(e.message||'')+')':(e.message||String(e));note('Google Calendar sync failed: '+m);if(interactive)toast('Google Calendar: '+m)}}
+  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);gNeed=false;gWhen=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(cur=='cal')render();note('Google Calendar is up to date.');toast('Google Calendar is connected and up to date.');
+ }catch(e){if(e.reconnect){gNeed=true;if(cur=='cal')render();return}const m=e.status==403?'Google blocked this. Make sure the Google Calendar API is enabled in Google Cloud, then try again. ('+(e.message||'')+')':(e.message||String(e));note('Google Calendar sync failed: '+m);if(interactive)toast('Google Calendar: '+m)}}
 
 /* ---- what changed in the calendar since you last looked ---- */
 function calDiff(a,b){
@@ -391,8 +392,7 @@ function calDiff(a,b){
  A.forEach((v,k)=>{if(!B.has(k))del.push(k)});
  const p=(w,l)=>l.length?w+' '+l.slice(0,3).join(', ')+(l.length>3?' +'+(l.length-3):''):'';
  return [p('Added',add),p('Changed',chg),p('Removed',del)].filter(Boolean).join(' · ')}
-/* reconnect Google Calendar on the first tap after opening the site (browsers only allow the sign-in check after a tap) */
-if(GOOGLE_CLIENT_ID&&st.g('cos_g')=='1')document.addEventListener('pointerdown',()=>{gLast=undefined;gSync(false)},{once:true});
+
 
 /* load Google sign-in early so the sign-in window opens straight from your tap (iPhone Safari needs this) */
 if(GOOGLE_CLIENT_ID&&navigator.onLine)gLoad().catch(()=>{});
@@ -421,4 +421,4 @@ function runSync(){
 
 function gBar(){
  const on=st.g('cos_g')=='1';
- return '<div class="gbar" style="margin:8px 0"><small>'+(on?'Google Calendar is connected'+(gWhen?'. Last synced '+gWhen+'.':'.'):'Google Calendar is not connected.')+'</small><div class="mini" style="margin:6px 0"><button data-a="gsync">'+(on?'Sync now':'Connect Google Calendar')+'</button></div></div>'}
+ return '<div class="gbar" style="margin:8px 0"><small>'+(on?(gNeed?'Google Calendar needs a quick reconnect. Press Sync now.':'Google Calendar is connected'+(gWhen?'. Last synced '+gWhen+'.':'.')):'Google Calendar is not connected.')+'</small><div class="mini" style="margin:6px 0"><button data-a="gsync">'+(on?'Sync now':'Connect Google Calendar')+'</button></div></div>'}
