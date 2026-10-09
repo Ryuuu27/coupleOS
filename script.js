@@ -77,8 +77,8 @@ function render(){
   <div class="add wrapit"><input type="text" id="new" placeholder="Expense name" aria-label="Expense name"><input type="number" id="amt" min="0" step="any" placeholder="₱" style="width:80px" aria-label="Amount"><select id="cat" aria-label="Category">${CAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="pb" aria-label="Paid by"><option value="A">${esc(N.A)}</option><option value="B">${esc(N.B)}</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='cal'){
   const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
-  h+=calTop(m)+notifLine()+'<div class="mini" style="margin:6px 0"><button data-a="gsync">Sync Google Calendar</button><button data-a="ght">Instant sync setup</button></div>';
-  h+=(rows.map(([x,i,d])=>`<div class="row evr"><div class="evt"><span class="evd">${esc(fmtD(iso(d)))}</span><b>${esc(x[0])}</b><span class="evm">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></div><div class="eva">${delb(i,x[0])}</div></div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
+  h+=calTop(m)+notifLine()+gBar();
+  h+=(rows.map(([x,i,d])=>`<div class="row evr" style="display:flex;align-items:flex-start;gap:10px;padding:12px 0"><div class="evt" style="flex:1;min-width:0"><span class="evd" style="display:block;font-size:13px;font-weight:700;color:var(--teal)">${esc(fmtD(iso(d)))}</span><b style="display:block;font-size:18px;font-weight:600;line-height:1.3;overflow-wrap:anywhere;margin:2px 0">${esc(x[0])}</b><span class="evm" style="display:block;font-size:14px;color:var(--mute)">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></div><div class="eva" style="flex:none">${delb(i,x[0])}</div></div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
   h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck · Done so far: ${esc(N.A)} ${(m.tally||{}).A||0}, ${esc(N.B)} ${(m.tally||{}).B||0}</small>`;
@@ -144,7 +144,7 @@ const cloud=!!window.FB&&location.protocol!='file:';
 const DEF=JSON.stringify(S),MODS=Object.keys(S);
 let synced=false,unsubC=null,unsubP=null,timer=null,last={},photos=[],pvi=-1;
 let GHT='';const GH_SYNC_REPO='Ryuuu27/couple-os-sync';/* the public repo that holds the Google sync job */
-let gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
+let gWhen='',gLast,gTok=null,gExp=0,gTimer=null,gClient=null;
 const REDIR=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||!!navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
 const GOOGLE_CLIENT_ID='918904043726-hho2k3cr47b7uoj728te7la4d86b2k2v.apps.googleusercontent.com';/* paste your Google OAuth client ID here (see setup steps) */
 const note=t=>{const n=$('sync');if(n)n.textContent=t};
@@ -381,7 +381,7 @@ async function gSync(interactive){
   for(const [id,x] of want){const b=JSON.stringify(gBody(x));
    if(hv.has(id))await gApi('events/'+id,{method:'PUT',body:b});
    else{try{await gApi('events',{method:'POST',body:b})}catch(e){if(e.status==409)await gApi('events/'+id,{method:'PUT',body:b});else throw e}}}
-  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);note('Google Calendar is up to date.');toast('Google Calendar is connected and up to date.');
+  st.s('cos_g','1');gLast=JSON.stringify(S.cal.items);gWhen=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});if(cur=='cal')render();note('Google Calendar is up to date.');toast('Google Calendar is connected and up to date.');
  }catch(e){const m=e.status==403?'Google blocked this. Make sure the Google Calendar API is enabled in Google Cloud, then try again. ('+(e.message||'')+')':(e.message||String(e));note('Google Calendar sync failed: '+m);if(interactive)toast('Google Calendar: '+m)}}
 
 /* ---- what changed in the calendar since you last looked ---- */
@@ -418,3 +418,7 @@ function runSync(){
  if(!GHT)return;
  fetch('https://api.github.com/repos/'+GH_SYNC_REPO+'/actions/workflows/google-sync.yml/dispatches',{method:'POST',keepalive:true,headers:{Authorization:'Bearer '+GHT,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify({ref:'main'})})
   .then(r=>{if(!r.ok)note('Instant sync could not start (GitHub error '+r.status+'). Check the token.')}).catch(()=>{})}
+
+function gBar(){
+ const on=st.g('cos_g')=='1';
+ return '<div class="gbar" style="margin:8px 0"><small>'+(on?'Google Calendar is connected'+(gWhen?'. Last synced '+gWhen+'.':'.'):'Google Calendar is not connected.')+'</small><div class="mini" style="margin:6px 0"><button data-a="gsync">'+(on?'Sync now':'Connect Google Calendar')+'</button></div></div>'}
