@@ -78,7 +78,7 @@ function render(){
  }else if(cur=='cal'){
   const rows=m.items.map((x,i)=>[x,i,nx(x)]).reverse();
   h+=calTop(m)+notifLine()+gBar();
-  h+=(rows.map(([x,i,d])=>`<div class="row evr" style="display:flex;align-items:flex-start;gap:10px;padding:12px 0"><div class="evt" style="flex:1;min-width:0"><span class="evd" style="display:block;font-size:13px;font-weight:700;color:var(--teal)">${esc(fmtD(iso(d)))}</span><b style="display:block;font-size:18px;font-weight:600;line-height:1.3;overflow-wrap:anywhere;margin:2px 0">${esc(x[0])}</b><span class="evm" style="display:block;font-size:14px;color:var(--mute)">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'All day'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></div><div class="eva" style="flex:none">${delb(i,x[0])}</div></div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
+  h+=(rows.map(([x,i,d])=>`<div class="row evr" style="display:flex;align-items:flex-start;gap:10px;padding:12px 0"><div class="evt" style="flex:1;min-width:0"><span class="evd" style="display:block;font-size:13px;font-weight:700;color:var(--teal)">${esc(fmtD(iso(d)))}</span><b style="display:block;font-size:18px;font-weight:600;line-height:1.3;overflow-wrap:anywhere;margin:2px 0">${esc(x[0])}</b><span class="evm" style="display:block;font-size:14px;color:var(--mute)">${x[4]?esc(x[4])+' · ':''}${x[3]?fmtTm(x[3]):'No time · reminds 6:00 AM'} · ${cd(d)}${x[2]==1?' · monthly':x[2]==2?' · yearly':''}</span></div><div class="eva" style="flex:none">${delb(i,x[0])}</div></div>`).join('')||'<p class="empty">No events yet. Add one below.</p>')+
   `<div class="add wrapit"><input type="date" id="dt" value="${plus(0)}" aria-label="Date"><input type="text" id="new" placeholder="Event name" aria-label="Event name"><label class="when2" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="tms"> Set a time</label><input type="time" id="tm" disabled aria-label="Time" style="font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)"><select id="ecat" aria-label="Category">${ECAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="rep" aria-label="Repeat"><option value="0">No repeat</option><option value="1">Monthly</option><option value="2">Yearly</option></select><button id="addb">Add</button></div>`;
  }else if(cur=='chr'){
   h+=`<div class="card"><small style="margin:0">Up next · ${esc(N[m.who])}</small><b>${esc(m.deck[m.i])}</b></div><div class="mini" style="flex-wrap:wrap"><button data-a="done">Done</button><button data-a="next">Draw random</button><button data-a="swap">Swap partner</button></div>`+addf('Add a chore')+`<small style="margin:10px 0 0">${m.deck.length} chores in the deck · Done so far: ${esc(N.A)} ${(m.tally||{}).A||0}, ${esc(N.B)} ${(m.tally||{}).B||0}</small>`;
@@ -286,7 +286,7 @@ function checkAlerts(){
  try{done=JSON.parse(st.g('cos_notified')||'{}')}catch(e){}
  S.cal.items.forEach(x=>{
   if(!occ(x,tk))return;
-  const [H,M]=(x[3]||'08:00').split(':').map(Number),at=H*60+M,id=tk+'|'+x[0]+'|'+x[1]+'|'+(x[3]||'');
+  const [H,M]=(x[3]||'06:00').split(':').map(Number),at=H*60+M,id=tk+'|'+x[0]+'|'+x[1]+'|'+(x[3]||'');
   if(done[id]||mins<at||(x[3]&&mins-at>180))return;
   done[id]=1;const msg=x[0]+(x[3]?' at '+fmtTm(x[3]):' today');
   toast('Reminder: '+msg);
@@ -300,7 +300,7 @@ setTimeout(checkAlerts,1500);setInterval(checkAlerts,20000);
 function preAlerts(){
  if(!S.cal||!S.cal.items)return;
  const now=new Date(),tk=iso(now),t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let done={};
- if(now.getHours()<8)return;
+ if(now.getHours()<6)return;
  try{done=JSON.parse(st.g('cos_pre')||'{}')}catch(e){}
  S.cal.items.forEach(x=>{const n=Math.round((nx(x)-t0)/864e5),big=['Anniversary','Birthday','Trip'].includes(x[4]);
   if(!(n==1||(n==3&&big)))return;const id=tk+'|'+n+'|'+x[0];if(done[id])return;done[id]=1;
@@ -365,8 +365,8 @@ function gBody(x){
  const big=['Anniversary','Birthday','Trip'].includes(x[4]),tz=Intl.DateTimeFormat().resolvedOptions().timeZone,p2=n=>String(n).padStart(2,'0');
  const b={id:gid(x),summary:x[0],description:x[4]||'',status:'confirmed',extendedProperties:{private:{cos:'1'}}};
  let ov;
- if(x[3]){const [h,m]=x[3].split(':').map(Number);b.start={dateTime:x[1]+'T'+x[3]+':00',timeZone:tz};b.end={dateTime:x[1]+'T'+(h<23?p2(h+1)+':'+p2(m):'23:59')+':00',timeZone:tz};ov=[0,1440].concat(big?[4320]:[])}
- else{const d=new Date(x[1]+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+1);b.start={date:x[1]};b.end={date:d.toISOString().slice(0,10)};ov=[960].concat(big?[3840]:[])}
+ {const tm=x[3]||'06:00',[h,m]=tm.split(':').map(Number);/* no time set = a reminder at 6:00 AM */
+  b.start={dateTime:x[1]+'T'+tm+':00',timeZone:tz};b.end={dateTime:x[1]+'T'+(h<23?p2(h+1)+':'+p2(m):'23:59')+':00',timeZone:tz};ov=[0,1440].concat(big?[4320]:[])}
  if(x[2])b.recurrence=['RRULE:FREQ='+(x[2]==2?'YEARLY':'MONTHLY')];
  b.reminders={useDefault:false,overrides:ov.map(minutes=>({method:'popup',minutes}))};
  return b}
